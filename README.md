@@ -38,9 +38,10 @@ Briefly outline the technologies, frameworks, and tools used in development.
 Describe the major technical or non-technical challenges your team encountered.
 
 ## 🏃 How to Run
+Frontend Setup (React)
 1. Clone the repository  
    ```sh
-   git clone https://github.com/your-repo.git
+   git clone https://github.com/your-repo.git](https://github.com/ewfx/aidhp-synapti-q.git
    ```
 2. Install dependencies  
    ```sh
@@ -50,6 +51,23 @@ Describe the major technical or non-technical challenges your team encountered.
    ```sh
    npm start  # or python app.py
    ```
+   The frontend app will be available at http://localhost:3000
+   
+Backend Setup (FastAPI)
+1. cd aidhp-synapti-q\code
+2. Create & Activate a Virtual Environment
+   Windows (PowerShell) : run below command
+   python -m venv venv
+   Set-ExecutionPolicy Unrestricted -Scope Process
+   .\venv\Scripts\activate
+3. Install Dependencies
+   pip install -r requirements.txt
+4. Run the Backend Server
+   uvicorn banking_api:app --host 0.0.0.0 --port 8000 --reload
+
+   The backend API will now be running at http://127.0.0.1:8000.
+   
+   
 
 ## 🏗️ Tech Stack
 - 🔹 Frontend: React / Vue / Angular
