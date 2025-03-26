@@ -120,7 +120,7 @@ Implementing voice & image-based chatbot interactions for seamless user engageme
 Despite these challenges, our team successfully built SynaptiQ Financial Assistant, delivering AI-driven financial intelligence that enhances decision-making and security. 🚀
 
 ## 🏃 How to Run
-Frontend Setup (React)
+**Frontend Setup (React)**
 1. Clone the repository  
    ```sh
    git clone https://github.com/your-repo.git](https://github.com/ewfx/aidhp-synapti-q.git
@@ -135,7 +135,7 @@ Frontend Setup (React)
    ```
    The frontend app will be available at http://localhost:3000
    
-Backend Setup (FastAPI)
+**Backend Setup (FastAPI)**
 1. cd aidhp-synapti-q\code
 2. Create & Activate a Virtual Environment
    Windows (PowerShell) : run below command
