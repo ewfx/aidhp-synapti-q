@@ -194,8 +194,6 @@ const clearAll = () => {
   }
 };
 
-
-
   const queuedRequest = async (url, options = {}) => {
     return new Promise((resolve, reject) => {
       requestQueue.push({
@@ -258,14 +256,6 @@ const clearAll = () => {
   };
 
   
-  
-  
-  
-  
-  
-  
-  
-  
   //followup test
   const handleFollowUp = async () => {
     if (!followUpQuestion.trim()) {
@@ -323,18 +313,6 @@ const clearAll = () => {
     }
 };
 
-  
-    
-  
-  
-  
-  
-  
-  
-
-  //
-
-
 //test
 
 const fetchFinancialAdvice = async () => {
@@ -353,7 +331,6 @@ const fetchFinancialAdvice = async () => {
     if (!response || typeof response !== 'object') {
       throw new Error('Invalid API response format');
     }
-
     
     const transformedData = {
       suggestion: validateString(response.financial_suggestion?.suggestion, 'No suggestion'),
@@ -374,7 +351,7 @@ const fetchFinancialAdvice = async () => {
   }
 };
 
-// Validation utilities (add these outside your component)
+// Validation utilities 
 function validateString(value, defaultValue = '') {
   return typeof value === 'string' ? value : defaultValue;
 }
@@ -388,9 +365,6 @@ function validateObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
 }
 //Another test
-
-
-
  
   const fetchDocumentClassification = async () => {
     setIsLoading(true);
@@ -502,8 +476,6 @@ function validateObject(value) {
     );
   }
   
-
-
   const fetchLoanApproval = async () => {
     setIsLoading(true);
     setError('');
@@ -530,7 +502,6 @@ function validateObject(value) {
         setIsLoading(false);
     }
 };
-
 
   
   const fetchFraudRisk = async () => {
@@ -774,10 +745,6 @@ function validateObject(value) {
 };
 
 
-
-
-
-
 // ✅ New Stop Function to Stop Both Mic & Speech
 const stopListening = () => {
     if (recognitionRef.current) {
@@ -786,7 +753,6 @@ const stopListening = () => {
     }
     window.speechSynthesis.cancel();
 };
-
 
 
 const [spokenText, setSpokenText] = useState("");
@@ -833,10 +799,6 @@ const speakResponse = (text) => {
   const utterance = new SpeechSynthesisUtterance(text);
   window.speechSynthesis.speak(utterance);
 };
-
-
-
-
     
   
   return (
@@ -995,13 +957,6 @@ const speakResponse = (text) => {
             🎤🎙️Stop
           </button>
 
-
-          
-
-
-
-
-
         </div>
 
         {error && (
@@ -1129,10 +1084,6 @@ const speakResponse = (text) => {
 )}
 
 
-
-
-
-
           {financialAdvice && (
                 <ResponseBox 
                     title="Financial Advice"
@@ -1193,15 +1144,10 @@ const speakResponse = (text) => {
 )}
 
 
-
-
       </div>
     </div>
   );
 };
-
-
-
 
 const ResponseBox = ({ title, content }) => {
   return (
