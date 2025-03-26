@@ -15,9 +15,12 @@
 
 ## 🎯 Introduction
 Topic: AI-Driven Hyper-Personalization & Recommendations
+
 User Dashboard name : SynaptiQ Financial Assistant 
+
 SynaptiQ is a revolutionary AI-powered financial assistant that brings hyper-personalized financial insights to individuals and businesses!
-SynaptiQ is a **next-generation AI-powered financial intelligence platform**, designed to provide **real-time, AI-driven financial decision-making support**. With **advanced fraud prevention, consent-based AI insights, and a chatbot supporting voice and image inputs**, SynaptiQ sets a **new benchmark for AI-driven financial security and investment management**. With 88% test coverage**, ML-powered risk assessments, and AI-driven **customer retention strategies![image](https://github.com/user-attachments/assets/4902c113-9964-461e-a033-c7a8a9559997)
+
+SynaptiQ is a **next-generation AI-powered financial intelligence platform**, designed to provide **real-time, AI-driven financial decision-making support**. With **advanced fraud prevention, consent-based AI insights, and a chatbot supporting voice and image inputs**, SynaptiQ sets a **new benchmark for AI-driven financial security and investment management**. With 88% test coverage**, ML-powered risk assessments, and AI-driven **customer retention strategies
 
 
 ## 🎥 Demo - If you tube link not working, try Google drive link
