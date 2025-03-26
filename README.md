@@ -30,7 +30,7 @@ https://youtu.be/ZfeX1CWt7l0
 https://drive.google.com/file/d/16v0Qd787tJpOKdffxeYwxcCPZcjROVO1/view?usp=drive_link
 🖼️ Screenshots:
 
-![Screenshot 1](link-to-image)
+PPT: 
 
 ## 💡 Inspiration
 In today's fast-paced financial world, individuals and businesses struggle with complex financial decision-making, fraud prevention, and investment planning. Many people lack access to real-time insights, leading to poor financial choices.
