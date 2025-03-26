@@ -24,7 +24,9 @@ SynaptiQ is a **next-generation AI-powered financial intelligence platform**, de
 
 
 ## 🎥 Demo - If you tube link not working, try Google drive link
-https://youtu.be/ZfeX1CWt7l0
+
+Demo link - https://youtu.be/VaeMpktWMws
+Backup demo link - https://youtu.be/ZfeX1CWt7l0
 
 
 https://drive.google.com/file/d/16v0Qd787tJpOKdffxeYwxcCPZcjROVO1/view?usp=drive_link
