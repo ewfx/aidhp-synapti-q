@@ -1205,28 +1205,26 @@ const buttonContainerStyle = {
 
 
 const buttonStyle = {
-  padding: "12px 16px", // ✅ Comfortable padding
-  fontSize: "16px", // ✅ Uniform text size
+  padding: "12px 16px", 
+  fontSize: "16px", 
   fontWeight: "bold",
   border: "none",
-  borderRadius: "8px", // ✅ Smooth rounded edges
+  borderRadius: "8px", 
   cursor: "pointer",
-  width: "160px", // ✅ Fixed width for consistency
+  width: "160px", 
   textAlign: "center",
   display: "inline-block",
   transition: "background-color 0.2s, transform 0.1s",
-  boxShadow: "2px 2px 5px rgba(0, 0, 0, 0.2)", // ✅ Subtle shadow
+  boxShadow: "2px 2px 5px rgba(0, 0, 0, 0.2)", 
 };
 
 const buttonHoverStyle = {
-  transform: "scale(1.05)", // ✅ Slight animation
+  transform: "scale(1.05)", 
 };
 
 const disabledButtonStyle = {
   opacity: 0.6,
   cursor: "not-allowed",
 };
-
-
 
 export default App;
