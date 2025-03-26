@@ -171,4 +171,4 @@ Despite these challenges, our team successfully built SynaptiQ Financial Assista
 
 ## 👥 Team : SynaptiQ
 - **Team** - Vivek Mani,Sonali Dwivedi, Sumabindu, Kusuma
-- 
+
