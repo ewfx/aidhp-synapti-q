@@ -55,21 +55,37 @@ By leveraging LLMs, NLP, and financial modeling, SynaptiQ provides a hyper-perso
 9.  Social Media-Based Financial Sentiment Analysis** 
 
 ## 🛠️ How We Built It
+
 Backend Technologies:
+
 FastAPI!
+
 XGBoost
+
 FAISS
+
 Google Gemini API
+
 Torchvision & OpenAI CLIP
+
 Pandas & NumPy
+
 Frontend Technologies:
+
 ReactJS
+
 Redux
+
 Material-UI
+
 Axios
+
 Chart.js
+
 Speech Recognition API
+
 Service Workers
+
 React Router
 
 
