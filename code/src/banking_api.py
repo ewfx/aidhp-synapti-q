@@ -1,12 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import xgboost as xgb
 from sklearn.cluster import KMeans
 import shap
 import requests
-from sklearn.ensemble import RandomForestClassifier  #  Import this for ML models
-import numpy as np  #  Added numpy for fraud risk predictions
+from sklearn.ensemble import RandomForestClassifier  
+import numpy as np 
 import joblib
 import json
 import re
@@ -40,6 +40,21 @@ import logging
 import os
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+from typing import Dict, Any, Optional, List 
+import logging
+from pydantic import BaseModel
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
+import time
+
+import pickle
+from datetime import datetime
+from pydantic import BaseModel
+from datetime import datetime 
+
+
+
 
 load_dotenv()
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Datasets')
@@ -47,9 +62,18 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Datasets')
 app = FastAPI()
 from fastapi.middleware.cors import CORSMiddleware
 
+platform_mapping = {
+    1: "Facebook",
+    2: "Instagram",
+    3: "Twitter",
+    4: "LinkedIn",
+    5: "TikTok",
+    6: "YouTube"
+}
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Your React app's URL
+    allow_origins=["http://localhost:3000"],  #  React app's URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -168,15 +192,6 @@ def get_customer_ids(limit: int = 20):
     ids = banking_df['Customer_ID'].head(limit).tolist()
     return {"available_customer_ids": ids}
 
-@app.get("/loan-customer-ids/")
-def get_loan_customer_ids(limit: int = 20):
-    #  Use full loan data if available
-    df = loan_df if 'loan_df' in globals() and not loan_df.empty else loan_credit_df
-    if df.empty:
-        raise HTTPException(500, "Loan data not available")
-    ids = df['customer_id'].head(limit).tolist()
-    return {"available_loan_customer_ids": ids}
-
 def convert_numpy_types(value):
     """Helper function to convert NumPy types to native Python types"""
     if isinstance(value, (np.integer, np.int64)):
@@ -185,106 +200,411 @@ def convert_numpy_types(value):
         return float(value)
     elif isinstance(value, np.ndarray):
         return value.tolist()
-    return value  # Return as is if already a native type
+    return value  
 
-@app.get("/financial/{customer_id}")
-def financial(customer_id: str):
-    """
-    Retrieves highly practical and unique financial insights with real-world examples for a given customer ID.
-    """
-    # Retrieve customer data
-    customer = banking_df[banking_df['Customer_ID'] == customer_id]
+def generate_ai_loan_insight(loan_data):
+    """Generates strictly formatted loan repayment insights only"""
+    
+    if not loan_data:
+        return {"status": "success", "message": "No active loan customers found."}
 
-    # Handle customer not found case - Return 200 with message instead of 404
-    if customer.empty:
+    personalized_insights = []
+    
+    for customer in loan_data:
+        # Create a locked-down prompt with explicit output control
+        insight_prompt = f"""
+        <<STRICT INSTRUCTIONS>>
+        You are a loan repayment analysis tool. You MUST ONLY:
+        - Analyze existing loan repayment options
+        - Suggest refinancing ONLY when mathematically beneficial
+        - Provide credit improvement tips if score <650
+        - Give 3 actionable steps
+        
+        <<PROHIBITED>>
+        - Never mention applications, approvals, or congratulations
+        - Never assume new loans are possible
+        - Never use generic templates
+        
+        <<REQUIRED FORMAT>>
+        Analysis for Customer {customer['customer_id']}:
+        1. Current Loan Analysis: [50 words max]
+        2. Repayment Strategy: [3 specific tactics]
+        3. Refinance Potential: [Yes/No + breakeven analysis]
+        4. Credit Tips: [Only if score <650]
+        5. Next Steps: [3 concrete actions with numbers]
+        
+        <<CUSTOMER DATA>>
+        Loan Amount: ${customer['loan_amount']}
+        Interest Rate: {customer['interest_rate']}%
+        Credit Score: {customer['credit_score']}
+        Monthly Payment: ${customer['monthly_installment']}
+        
+        <<BEGIN ANALYSIS>>"""
+        
+        # API configuration to enforce strict behavior
+        payload = {
+            "contents": [{
+                "parts": [{"text": insight_prompt}],
+                "role": "model",
+                "examples": [
+                    {
+                        "input": {"content": "Generic loan approval template"},
+                        "output": {"content": "[REJECTED] Only repayment analysis permitted"}
+                    }
+                ]
+            }],
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_DEROGATORY", "threshold": "BLOCK_ONLY_HIGH"}
+            ],
+            "generationConfig": {
+                "temperature": 0.3,  # Lower for more deterministic responses
+                "topK": 20,
+                "topP": 0.7,
+                "maxOutputTokens": 500,
+                "stopSequences": ["Congratulations", "approved"]
+            }
+        }
+
+        try:
+            # First attempt
+            response = get_ai_response(payload)
+            
+            # Validation and retry if needed
+            if contains_prohibited_phrases(response):
+                payload["generationConfig"]["temperature"] = 0.1  # More strict
+                response = get_ai_response(payload)
+                
+                if contains_prohibited_phrases(response):
+                    response = manually_structured_response(customer)
+            
+            personalized_insights.append({
+                "customer_id": customer['customer_id'],
+                "ai_insight": response
+            })
+            
+        except Exception as e:
+            personalized_insights.append({
+                "customer_id": customer['customer_id'],
+                "ai_insight": manually_structured_response(customer),
+                "error": str(e)
+            })
+    
+    return personalized_insights
+
+def get_ai_response(payload):
+    """Helper function to call AI API"""
+    headers = {
+        "Content-Type": "application/json",
+        "X-Require-Strict": "true"  # Custom header if  API supports it
+    }
+    res = requests.post(f"{API_URL}?key={API_KEY}", json=payload, headers=headers)
+    res.raise_for_status()
+    return res.json()['candidates'][0]['content']['parts'][0]['text']
+
+def contains_prohibited_phrases(text):
+    """Validates response against unwanted content"""
+    prohibited = [
+        "approved", "congrat", "application", 
+        "good news", "pleased to inform", "qualify"
+    ]
+    return any(phrase.lower() in text.lower() for phrase in prohibited)
+
+def manually_structured_response(customer):
+    """Fallback template when AI fails"""
+    return f"""
+    Analysis for Customer {customer['customer_id']}:
+    1. Current Loan Analysis: ${customer['loan_amount']} at {customer['interest_rate']}% interest
+    2. Repayment Strategy: 
+       - Make biweekly payments of ${round(customer['monthly_installment']/2, 2)}
+       - Allocate 10% extra to principal monthly
+       - Review budget for additional $100/month payment
+    3. Refinance Potential: {'Yes' if customer['credit_score'] > 700 else 'No'}
+    4. Credit Tips: {'Increase credit limits and reduce utilization' if customer['credit_score'] < 650 else 'N/A'}
+    5. Next Steps: 
+       1) Contact lender about repayment options
+       2) Set up automatic payments
+       3) Review expenses for additional payment capacity
+    """
+
+@app.get("/loan-customer-ids/")
+def get_loan_customer_ids(customer_id: int =20):
+    """
+    Retrieves a list of customer IDs with loan-related data.
+    - Returns a Generative AI financial insight alongside the customer IDs.
+    """
+    # Use full loan data if available
+    df = loan_df if 'loan_df' in globals() and not loan_df.empty else loan_credit_df
+    
+    if df.empty:
         return {
             "status": "success",
-            "message": "Customer details are not updated with me as of now.",
-            "real_time_savings_advice": "If you’re unsure about investments, start with an index mutual fund (e.g., S&P 500). Historically, this has provided **8-10% annual returns** over long periods, making it a solid beginner choice!"
+            "message": "Loan data is not available at the moment.",
+            "ai_insight": generate_ai_loan_insight(0),  # AI generates a response for no data
+            "available_loan_customer_ids": []
         }
 
-    # Ensure required features exist
-    required_cols = ['Age', 'Income', 'Credit_Score', 'Existing_Loans']
-    missing_cols = [col for col in required_cols if col not in customer.columns]
-    if missing_cols:
-        return {
-            "status": "error",
-            "message": f"Missing required customer data features: {missing_cols}"
-        }
+    # Convert NumPy types to Python-native types
+    #ids = [convert_numpy_types(cust_id) for cust_id in df['customer_id'].head(limit).tolist()]
+    loan_data = df.head(limit).to_dict(orient="records")
+    loan_data = [{k: convert_numpy_types(v) for k, v in customer.items()} for customer in loan_data]
 
-    # Convert NumPy data types to Python native types
-    age = convert_numpy_types(customer['Age'].iloc[0])
-    income = convert_numpy_types(customer['Income'].iloc[0])
-    credit_score = convert_numpy_types(customer['Credit_Score'].iloc[0])
-
-    # Mock ML Prediction
-    try:
-        prediction = 0  # Simulating a category prediction
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": "Financial model prediction error",
-            "details": str(e)
-        }
-
-    # Prediction Categories Mapping
-    prediction_categories = {
-        0: "Invest in Mutual Funds",
-        1: "Increase Savings",
-        2: "Reduce Spending",
-        3: "Consider a Loan",
-        4: "Review Insurance Plans"
-    }
-    prediction_label = prediction_categories.get(prediction, "Unknown Category")
-
-    # Generate AI Insight Prompt with a **Highly Practical & Unique** Response
-    insight_prompt = f"""
-    Provide a **very practical not so lengthy, a bit tabular example, unique, and actionable financial recommendation** based on the category below.
-    The recommendation should be something **most people wouldn't think of immediately** but is **highly effective**.
     
-    Prediction category: {prediction_label}
-    
-    Customer details:
-    - Age: {age}
-    - Income: {income}
-    - Credit Score: {credit_score}
-    
-    **Provide:**
-    1. A **highly practical, unique, and unconventional financial strategy** specific to this user wuth user age and income, if any loan or something.
-    2. A **real-world example** not more than 5 lines, a bit tabular example only if needed of how someone in a similar financial situation benefited from this advice.
-    3. A smart approach to investing in **Mutual Funds and Shares** for long-term wealth growth maximm couple of lines and Stocks & mutual funds fluctuate—diversify wisely!.
-    4. Tell why your suggestions are nice in maximum 1 line.
-    """
+    # Fetch AI-generated loan insights
+    ai_insight = generate_ai_loan_insight((loan_data))
+    insights_dict = {insight['customer_id']: insight.get('ai_insight', 'No insight available') 
+                    for insight in ai_insight}
 
-    # AI API Call
-    headers = {"Content-Type": "application/json"}
-    payload = {"contents": [{"parts": [{"text": insight_prompt}]}]}
-
-    try:
-        res = requests.post(f"{API_URL}?key={API_KEY}", json=payload, headers=headers)
-        res.raise_for_status()
-        result = res.json()
-        ai_response = result['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": "AI API request failed",
-            "details": str(e)
-        }
-
-    # Final Response (With Proper Type Conversion to Prevent JSON Errors)
     return {
         "status": "success",
-        "customer_id": customer_id,
-        "age": age,
-        "income": income,
-        "credit_score": credit_score,
-        "prediction_category": prediction_label,
-        "practical_unique_financial_advice": ai_response,
-        "real_time_savings_advice": "For Mutual Funds, consider a **50-30-20 rule**: 50% into a balanced mutual fund, 30% into high-growth index funds, and 20% into individual stocks. This ensures diversification while capturing market gains."
+        "customers": [{
+            "customer_data": customer,
+            "ai_insight": insights_dict.get(customer['customer_id'], "No insight available")
+        } for customer in loan_data]
+    }
+
+
+
+#####
+
+import os
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel
+from typing import Optional
+import joblib
+import pandas as pd
+import numpy as np
+from fastapi import Path
+import logging
+import requests
+from nltk.sentiment import SentimentIntensityAnalyzer
+import nltk
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# Configuration
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'financial_suggestion_model.pkl')
+
+PLATFORM_MAPPING = {1: "Facebook", 2: "Instagram", 3: "Twitter", 4: "LinkedIn"}
+
+# Response Models
+class FinancialSuggestion(BaseModel):
+    suggestion: str
+    confidence: float
+    probabilities: dict
+
+class SocialAnalysis(BaseModel):
+    platform: str
+    recommendation: str
+    sentiment_score: float
+
+class LoanAnalysis(BaseModel):
+    amount: float
+    interest_rate: float
+    repayment_strategy: str
+    refinance_recommendation: str
+
+class FinancialAdviceResponse(BaseModel):
+    status: str
+    customer_id: str
+    financial_suggestion: FinancialSuggestion
+    ai_advice: str
+    social_analysis: Optional[SocialAnalysis] = None
+    loan_analysis: Optional[LoanAnalysis] = None
+
+class ErrorResponse(BaseModel):
+    detail: str
+    error_code: str
+    suggestion: Optional[str] = None
+
+# Load model at startup
+try:
+    artifacts = joblib.load(MODEL_PATH)
+    model = artifacts['model']
+    features = artifacts['features']
+    label_encoders = artifacts.get('label_encoders', {})
+    logger.info(f"Model loaded successfully from {MODEL_PATH}")
+except Exception as e:
+    logger.error(f"Model loading failed: {str(e)}")
+    raise RuntimeError("Service initialization failed")
+
+def convert_numpy_types(value):
+    """Convert numpy types to native Python types safely"""
+    if isinstance(value, (np.integer)):
+        return int(value)
+    elif isinstance(value, (np.floating)):
+        return float(value)
+    elif isinstance(value, np.ndarray):
+        return value.tolist()
+    elif pd.isna(value):
+        return None
+    return value
+
+def get_ai_response(prompt: str, temperature: float = 0.7) -> str:
+    """Get AI response with robust error handling"""
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": max(0, min(1, temperature)),
+            "topP": 0.9,
+            "maxOutputTokens": 500,
+            "stopSequences": ["disclaimer", "approval"]
+        }
     }
     
+    try:
+        response = requests.post(
+            f"{API_URL}?key={API_KEY}",
+            json=payload,
+            headers=headers,
+            timeout=30
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        logger.error(f"AI API error: {str(e)}")
+        raise HTTPException(503, detail="AI service unavailable")
+
+@app.get(
+    "/financial/{customer_id}",
+    response_model=FinancialAdviceResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Customer not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+        503: {"model": ErrorResponse, "description": "Service unavailable"}
+    }
+)
+async def get_financial_advice(
+    customer_id: str = Path(..., description="Customer ID to lookup"),  # Changed Query to Path
+    include_social: bool = Query(True, description="Include social media analysis"),
+    include_loans: bool = Query(True, description="Include loan analysis"),
+    creativity: float = Query(0.7, ge=0, le=1, description="AI creativity level (0-1)")
+):
+    """
+    Get comprehensive financial advice for a customer
+    
+    Returns:
+    - ML-based financial suggestion with confidence scores
+    - AI-generated detailed advice
+    - Optional social media analysis
+    - Optional loan analysis
+    """
+    try:
+        # 1. Retrieve and validate customer data
+        try:
+            customer = banking_df[banking_df['Customer_ID'] == customer_id].iloc[0]
+        except IndexError:
+            raise HTTPException(404, detail={
+                "detail": "Customer not found",
+                "error_code": "CUSTOMER_NOT_FOUND",
+                "suggestion": "Verify customer ID exists in the system"
+            })
+        
+        # 2. Convert data to native types
+        customer_data = {k: convert_numpy_types(v) for k, v in customer.items()}
+        
+        # 3. Generate ML suggestion
+        try:
+            input_features = [customer_data.get(f, 0) for f in features]
+            suggestion = model.predict([input_features])[0]
+            probabilities = model.predict_proba([input_features])[0]
+            
+            ml_suggestion = FinancialSuggestion(
+                suggestion=suggestion,
+                confidence=float(np.max(probabilities)),
+                probabilities=dict(zip(model.classes_, probabilities))
+            )
+        except Exception as e:
+            logger.error(f"Model prediction failed: {str(e)}")
+            raise HTTPException(500, detail={
+                "detail": "Financial suggestion generation failed",
+                "error_code": "MODEL_ERROR"
+            })
+
+        # 4. Generate AI advice
+        ai_prompt = f"""
+        Financial Profile:
+        - Age: {customer_data.get('Age', 'N/A')}
+        - Income: ${customer_data.get('Income', 0):,.2f}
+        - Credit Score: {customer_data.get('Credit_Score', 0)}
+        - Existing Loans: {customer_data.get('Existing_Loans', 0)}
+        
+        Model Suggestion: {ml_suggestion.suggestion} (Confidence: {ml_suggestion.confidence:.0%})
+        
+        Provide:
+        1. Specific suggestions (3 bullet points)
+        2. Expected outcomes 
+        3. Risk considerations make sure to have full meaningful sentence
+        """
+        
+        ai_advice = get_ai_response(ai_prompt, creativity)
+
+        # 5. Social media analysis
+        social_analysis = None
+        if include_social and all(f in customer_data for f in ['Social_Media_Platform', 'Customer_Feedback']):
+            try:
+                platform = PLATFORM_MAPPING.get(int(customer_data['Social_Media_Platform']), "Social Media")
+                sentiment = SentimentIntensityAnalyzer().polarity_scores(customer_data['Customer_Feedback'])
+                
+                social_analysis = SocialAnalysis(
+                    platform=platform,
+                    recommendation=get_ai_response(
+                        f"Create a {platform}-appropriate financial tip for a user with sentiment score {sentiment['compound']:.2f}",
+                        min(creativity + 0.2, 1.0)
+                    ),
+                    sentiment_score=sentiment['compound']
+                )
+            except Exception as e:
+                logger.warning(f"Social analysis skipped: {str(e)}")
+
+        # 6. Loan analysis
+        loan_analysis = None
+        if include_loans and customer_data.get('loan_amount', 0) > 0:
+            try:
+                loan_analysis = LoanAnalysis(
+                    amount=customer_data['loan_amount'],
+                    interest_rate=customer_data.get('interest_rate', 0),
+                    repayment_strategy=get_ai_response(
+                        f"Suggest optimal repayment for ${customer_data['loan_amount']:,.2f} loan at {customer_data.get('interest_rate', 0)}% interest",
+                        max(creativity - 0.3, 0.1)
+                    ),
+                    refinance_recommendation=get_ai_response(
+                        f"Should a customer with credit score {customer_data.get('Credit_Score', 0)} refinance a {customer_data.get('interest_rate', 0)}% loan? Answer yes/no with brief reasoning",
+                        0.3
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"Loan analysis skipped: {str(e)}")
+
+        return FinancialAdviceResponse(
+            status="success",
+            customer_id=customer_id,
+            financial_suggestion=ml_suggestion,
+            ai_advice=ai_advice,
+            social_analysis=social_analysis,
+            loan_analysis=loan_analysis
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(500, detail={
+            "detail": "Internal processing error",
+            "error_code": "INTERNAL_ERROR"
+        })
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 #Load the Trained Churn Model
+
+import json
+import requests
 
 def get_llm_churn_risk(customer_id):
     """
@@ -431,75 +751,86 @@ def predict_churn(customer_id: str):
 
 @app.get("/loan/{customer_id}")
 def loan(customer_id: str):
-    #  Use full loan data if available
-    df = loan_df if 'loan_df' in globals() and not loan_df.empty else loan_credit_df
+    """
+    Retrieves loan details for a specific customer and provides AI-driven financial recommendations.
+    """
+    
+    df = loan_credit_df
     customer = df[df['customer_id'] == customer_id]
+
     if customer.empty:
-        raise HTTPException(404, "Customer not found")
-    required_cols = ['age', 'income', 'credit_score', 'existing_loans']
+        return {
+            "status": "error",
+            "message": f"Customer ID {customer_id} not found in the loan dataset."
+        }
+
+    # Ensure required columns exist
+    required_cols = ['age', 'income', 'credit_score', 'existing_loans', 'loan_approval_status', 'debt_to_income_ratio', 'loan_interest_rate']
     missing_cols = [col for col in required_cols if col not in customer.columns]
+
     if missing_cols:
         raise HTTPException(500, f"Missing required loan features: {missing_cols}")
+
+    #Convert DataFrame row to dictionary and ensure correct data types
+    loan_details = customer.to_dict(orient="records")[0]  # Extract first row as dictionary
+    loan_details = {k: convert_numpy_types(v) for k, v in loan_details.items()}  # Convert NumPy types
+
+    #Loan Approval Prediction
+    loan_features = ['age', 'income', 'credit_score', 'existing_loans']
+    customer_filtered = customer[loan_features]
+    
     try:
-        #prediction = loan_model.predict(customer[['age', 'income', 'credit_score', 'existing_loans']])[0]
-        #  Standardize feature names before passing to the model
-        customer = customer.rename(columns={
-            "Age": "age",
-            "Income": "income",
-            "Credit_Score": "credit_score",
-            "Existing_Loans": "existing_loans"
-        })
-
-        #  Ensure only the required columns are passed
-        loan_features = ['age', 'income', 'credit_score', 'existing_loans']
-        customer = customer[loan_features]
-
-        #  Make prediction
-        prediction = loan_model.predict(customer)[0]
-
+        prediction = loan_model.predict(customer_filtered)[0]
+        prediction = int(prediction)  # Ensure it's a native int
     except Exception as e:
         raise HTTPException(500, f"Loan model prediction error: {e}")
-    # Create dynamic AI-generated insights
-    prompt = f"""
-    Provide a clear, concise, personalized message to a customer based on the loan approval status below:
+
+    #Create AI Prompt for Financial & Loan Recommendations
+    ai_prompt = f"""
+     **Customer Financial Analysis Report**
     
-    Loan approval prediction category: {prediction}
-    
-    Categories:
-    0: Approved
-    1: Rejected
-    2: Pending
-    
-    Customer details:
-    Age: {customer['age'].iloc[0]}, 
-    Income: {customer['income'].iloc[0]}, 
-    Credit Score: {customer['credit_score'].iloc[0]}, 
-    Existing Loans: {customer['existing_loans'].iloc[0]}
-    
-    Write a friendly and professional message (1-2 sentences) clearly explaining the status and any recommended actions.
+     **Your Task:** You are a financial expert analyzing a customer's financial health based on their loan data.
+
+    **Loan Approval Prediction:** {prediction}
+
+    **Customer Financial Data:**
+    {loan_details}
+
+     **Instructions:**
+    - **Evaluate the customer's financial stability** and potential loan risks.
+    - If **loan approval is rejected**, suggest alternative financial solutions, also indetailed why its rejected.
+    - If **debt-to-income ratio is high (>0.4)**, recommend ways to lower it and suggest how.
+    - If **credit score is below 650**, suggest strategies to improve it and say even your loan was initialy approved but chances to final rejection is high and why.
+    - If **interest rate is too high**, recommend refinancing options and why.
+    - Suggest **investment or savings strategies** based on income and risk.
+    - Provide a **real-world example** of someone who successfully improved their financial situation.
+
+    **Generate a detailed, personalized, and customer-friendly financial report not more than 10 to 12 lines but very very meaningful and if and again saying if needed then give advise what to do?**
     """
+
+    # Make AI API Call
     headers = {"Content-Type": "application/json"}
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    payload = {"contents": [{"parts": [{"text": ai_prompt}]}]}
+
     try:
         res = requests.post(f"{API_URL}?key={API_KEY}", json=payload, headers=headers)
-    except Exception as e:
-        raise HTTPException(500, f"AI API request failed: {e}")
-    if res.status_code == 200:
+        res.raise_for_status()
         result = res.json()
-        try:
-            ai_message = result['candidates'][0]['content']['parts'][0]['text']
-            return {"loan_approval_insight": ai_message}
-        except (IndexError, KeyError):
-            raise HTTPException(500, "Unexpected AI response structure.")
-    else:
-        raise HTTPException(res.status_code, f"AI API error: {res.text}")
+        ai_message = result['candidates'][0]['content']['parts'][0]['text']
 
-platform_mapping = {
-    0: "Facebook",
-    1: "Instagram",
-    2: "Twitter",
-    3: "LinkedIn"
-}
+        return {
+            "status": "success",
+            "customer_id": customer_id,
+            "loan_approval_prediction": prediction,
+            "loan_details": loan_details,  # ✅ Fixed JSON serialization
+            "financial_recommendation": ai_message
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"AI API request failed: {str(e)}"
+        }
 
 @app.get("/personalized-advice/{customer_id}")
 def personalized_advice(customer_id: str):
@@ -565,7 +896,14 @@ def subscription_advice(customer_id: str):
     headers = {"Content-Type": "application/json"}
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     try:
-        res = requests.post(f"{API_URL}?key={API_KEY}", json=payload, headers=headers)
+        res = requests.post(
+            f"{API_URL}?key={API_KEY}",
+            json=payload,
+            headers=headers,
+            timeout=30  # this timeout parameter
+    )
+    except requests.exceptions.Timeout:
+        raise HTTPException(408, "AI API request timed out after 30 seconds")
     except Exception as e:
         raise HTTPException(500, f"AI API request failed: {e}")
     if res.status_code == 200:
@@ -684,13 +1022,20 @@ def market_insights(business_id: str):
     - Advertising Budget: ${ad_budget}
     - Brand Reputation Score: {brand_score}/5
     - Social Media Engagement: {social_engagement}
-    
+    - strongly advice
     Clearly suggest one actionable strategy for business growth or improved market positioning in 1-2 sentences.
     """
     headers = {"Content-Type": "application/json"}
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     try:
-        res = requests.post(f"{API_URL}?key={API_KEY}", json=payload, headers=headers)
+        res = requests.post(
+        f"{API_URL}?key={API_KEY}",
+        json=payload,
+        headers=headers,
+        timeout=30  # line for 30-second timeout
+    )
+    except requests.exceptions.Timeout:
+        raise HTTPException(408, "AI API request timed out after 30 seconds")
     except Exception as e:
         raise HTTPException(500, f"AI API request failed: {e}")
     if res.status_code == 200:
@@ -703,7 +1048,7 @@ def market_insights(business_id: str):
     else:
         raise HTTPException(res.status_code, f"AI API error: {res.text}")
 
-# Initialize logging
+# logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -977,15 +1322,15 @@ for model_name in ["loan_model", "fraud_model", "subscription_model", "wealth_mo
 
 #  LLM API (Replace with actual API key)
 
-
-def call_llm(prompt):
+#old
+def call_llmm(prompt):
     """Handles Google Gemini API failures with retries."""
     headers = {"Content-Type": "application/json"}
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
     for attempt in range(3):  #  Retry up to 3 times
         try:
-            response = requests.post(f"{API_URL}?key={API_KEY}", json=payload, headers=headers, timeout=10)
+            response = requests.post(f"{API_URL}?key={API_KEY}", json=payload, headers=headers, timeout=30)
 
             if response.status_code == 200:
                 result = response.json()
@@ -1009,7 +1354,7 @@ def call_llm(prompt):
     return "⚠️ AI Service Failed After Multiple Attempts."
 
 #  Chatbot API Endpoint
-class ChatRequest(BaseModel):
+class ChatRequestt(BaseModel):
     query: str
     customer_id: str = None
 
@@ -1023,103 +1368,389 @@ datasets = {
     "banking": pd.DataFrame(columns=['Customer_ID', 'budget', 'income', 'expenses'])
 }
 
-def format_as_table(data):
+def fformat_as_table(data):
     """Converts dictionary data into Markdown table format."""
     table = "| " + " | ".join(data.keys()) + " |\n"
     table += "| " + " | ".join(["---"] * len(data)) + " |\n"
     table += "| " + " | ".join(str(v) for v in data.values()) + " |\n"
     return table
 
+import re
+import pandas as pd
+import requests
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import logging
+import json
+from typing import Optional, Tuple
+import os
+
+
+logger = logging.getLogger(__name__)
+# ===== MODELS =====
+class ChatRequest(BaseModel):
+    query: str
+    customer_id: Optional[str] = None
+
+# ===== CORE FUNCTIONS =====
+def format_as_table(data: dict) -> str:
+    """Converts dictionary to Markdown table format."""
+    if not data:
+        return ""
+    headers = "| " + " | ".join(data.keys()) + " |\n"
+    separators = "| " + " | ".join(["---"] * len(data)) + " |\n"
+    values = "| " + " | ".join(str(v) for v in data.values()) + " |"
+    return headers + separators + values
+
+def detect_id(query: str) -> Optional[Tuple[str, str]]:
+    """Detects IDs in natural language queries"""
+    patterns = [
+        ("transaction_id", r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"),
+        ("customer_id", r"CUST-\d{4}"),
+        ("business_id", r"BUS-\d{5}")
+    ]
+    for id_type, pattern in patterns:
+        match = re.search(pattern, query, re.IGNORECASE)
+        if match:
+            return (id_type, match.group(0))
+    return None
+
+def get_transaction_insights(transaction_id: str) -> dict:
+    """Get all data related to a specific transaction"""
+    insights = {}
+    
+    if not fraud_df.empty and "Transaction ID" in fraud_df.columns:
+        txn_record = fraud_df[fraud_df["Transaction ID"] == transaction_id]
+        if not txn_record.empty:
+            # Standardize column names
+            record = txn_record.iloc[0].to_dict()
+            insights.update({
+                k.replace(" ", "_"): v for k, v in record.items()
+            })
+            
+            # Link to customer if available (handling both column name variations)
+            customer_id = record.get("Customer_ID") or record.get("Customer ID")
+            if customer_id:
+                customer_insights = get_customer_insights(customer_id)
+                insights.update({"Customer_" + k: v for k, v in customer_insights.items()})
+    
+    return insights
+
+def get_customer_insights(customer_id: str) -> dict:
+    """Aggregates customer data from all datasets"""
+    insights = {}
+    
+    # Check banking data
+    if not banking_df.empty and "Customer_ID" in banking_df.columns:
+        bank_record = banking_df[banking_df["Customer_ID"] == customer_id]
+        if not bank_record.empty:
+            insights.update({"Banking_" + k: v for k, v in bank_record.iloc[0].to_dict().items()})
+    
+    # Check fraud data (using both possible column names)
+    if not fraud_df.empty:
+        fraud_col = "Customer ID" if "Customer ID" in fraud_df.columns else "Customer_ID"
+        if fraud_col in fraud_df.columns:
+            fraud_record = fraud_df[fraud_df[fraud_col] == customer_id]
+            if not fraud_record.empty:
+                insights.update({
+                    "Fraud_" + k.replace(" ", "_"): v 
+                    for k, v in fraud_record.iloc[0].to_dict().items()
+                    if k not in ["Customer ID", "Customer_ID"]
+                })
+    
+    # Check churn data
+    if not churn_df.empty and "Customer_ID" in churn_df.columns:
+        churn_record = churn_df[churn_df["Customer_ID"] == customer_id]
+        if not churn_record.empty:
+            insights.update({"Churn_" + k: v for k, v in churn_record.iloc[0].to_dict().items()})
+    
+    return insights
+
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'financial_suggestion_model.pkl')
+
+class LocalModelFallback:
+    def __init__(self):
+        self.local_model = None
+        self.last_updated = None
+        self._load_local_model()
+
+    def _load_local_model(self):
+        """Load the local model with error handling"""
+        try:
+            if os.path.exists(MODEL_PATH):
+                with open(MODEL_PATH, 'rb') as f:
+                    self.local_model = pickle.load(f)
+                self.last_updated = datetime.fromtimestamp(os.path.getmtime(MODEL_PATH))
+                logger.info(f"Local model loaded (last updated: {self.last_updated})")
+            else:
+                logger.warning("Local model file not found")
+        except Exception as e:
+            logger.error(f"Error loading local model: {e}")
+
+    def generate_fallback_response(self, prompt):
+        """Generate response using local model"""
+        if self.local_model is None or isinstance(self.local_model, np.ndarray):
+            return None
+            
+        try:
+            # Preprocess prompt to match local model's expected input format
+            processed_input = self._preprocess_prompt(prompt)
+            
+            # Get prediction from local model
+            if hasattr(self.local_model, 'predict'):
+                prediction = self.local_model.predict([processed_input])[0]
+            else:  # Handle numpy array case
+                prediction = np.random.choice(self.local_model)
+            
+            # Format the response
+            return self._format_response(prediction)
+        except Exception as e:
+            logger.error(f"Local model prediction failed: {e}")
+            return None
+
+    def _preprocess_prompt(self, text):
+        """Basic preprocessing to match training data format"""
+        # Add your actual preprocessing logic here
+        return text.lower().strip()[:500]  # Example: limit to 500 chars
+
+    def _format_response(self, prediction):
+        """Format the model's prediction into a user-friendly response"""
+        # Customize based on your model's output format
+        return f"⚠️ AI Service Unavailable. Local Model Suggestion: {prediction}"
+
+# Initialize fallback handler
+fallback_handler = LocalModelFallback()
+
+def call_llm(prompt: str) -> str:
+    """
+    Enhanced LLM caller with:
+    - Automatic API retries
+    - Local model fallback
+    - Consistent response formatting
+    - Error recovery
+    """
+    
+    def format_response(raw_text: str, source: str) -> str:
+        """
+        Standardize all responses with consistent formatting
+        """
+        # Clean the response
+        cleaned = raw_text.strip()
+        
+        # Format based on content type
+        if "|" in cleaned and "-|-" in cleaned:  # Table detection
+            return f"📊 {source} Analysis:\n\n{cleaned}\n\n(Source: {source})"
+        
+        elif any(x in cleaned.lower() for x in ["recommend", "suggest"]):  # Recommendation
+            return f"⭐ {source} Recommendation:\n\n{cleaned}\n"
+        
+        elif any(x in cleaned for x in ["•", "- "]) and "\n" in cleaned:  # List
+            return f"📋 {source} Advice:\n\n{cleaned}\n"
+        
+        # Default formatting
+        return f"{source} Response:\n\n{cleaned}\n"
+
+    # Try online API first
+    api_response = try_online_api(prompt)
+    if api_response and not api_response.startswith("⚠️"):
+        return format_response(api_response, "AI Analysis")
+    
+    # Fallback to local model
+    local_response = fallback_handler.generate_fallback_response(prompt)
+    if local_response:
+        return format_response(local_response, "Local Model")
+    
+    # Final fallback message
+    return format_response(
+        "Our AI services are currently unavailable. Here's some general financial advice:\n\n" +
+        "• Review your budget and spending habits\n" +
+        "• Consider diversifying your investments\n" +
+        "• Consult with a financial advisor for personalized guidance",
+        "System"
+    )
+
+def try_online_api(prompt: str) -> str:
+    """Try calling the online API with enhanced formatting awareness"""
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{
+            "parts": [{
+                "text": f"Format your response with clear sections, bullet points, or tables when appropriate.\n\n{prompt}"
+            }]
+        }],
+        "generationConfig": {
+            "response_mime_type": "text/markdown"  # Request formatted responses
+        }
+    }
+
+    for attempt in range(10):
+        try:
+            response = requests.post(f"{API_URL}?key={API_KEY}", 
+                                   json=payload, 
+                                   headers=headers, 
+                                   timeout=20)
+            
+            if response.status_code == 200:
+                result = response.json()
+                raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+                
+                # Post-process API response
+                return postprocess_response(raw_text)
+                
+            elif response.status_code == 429:
+                time.sleep(min(2**attempt, 10))
+                continue
+                
+        except Exception as e:
+            logger.error(f"API attempt {attempt+1} failed: {str(e)}")
+            time.sleep(1)
+    
+    return None
+
+def postprocess_response(text: str) -> str:
+    """Clean and standardize API responses"""
+    # Remove redundant prefixes
+    for prefix in ["Here's your analysis:", "My response:", "Answer:"]:
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+    
+    # Fix markdown tables
+    if "|" in text:
+        text = text.replace("| |", "|---|")
+        text = text.replace("|-|", "|---|")
+    
+    # Ensure consistent line breaks
+    text = "\n".join(line.strip() for line in text.split("\n"))
+    
+    return text
+
+def try_online_api(prompt: str) -> str:
+    """Try calling the online API with retries"""
+    headers = {"Content-Type": "application/json"}
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    for attempt in range(3):
+        try:
+            response = requests.post(f"{API_URL}?key={API_KEY}", 
+                                  json=payload, 
+                                  headers=headers, 
+                                  timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result["candidates"][0]["content"]["parts"][0]["text"].strip()
+            
+            elif response.status_code in [401, 403]:
+                logger.error("Authentication failed")
+                return "⚠️ Authentication failed. Check API keys."
+                
+            elif response.status_code == 429:
+                time.sleep(min(2**attempt, 10))  # Exponential backoff
+                continue
+                
+            else:
+                logger.error(f"API error {response.status_code}")
+                return None  # Trigger fallback
+                
+        except Exception as e:
+            logger.error(f"API call failed: {e}")
+            time.sleep(1)
+            
+    return None  # Trigger fallback
+
+# ===== MAIN ENDPOINT =====
 @app.post("/chatbot/")
 async def chatbot(request: ChatRequest):
     try:
         insights = {}
-        dataset_mapping = {
-            "credit score": "loan",
-            "loan": "loan",
-            "fraud": "fraud",
-            "investment": "wealth",
-            "savings": "wealth",
-            "spending": "subscription",
-            "subscription": "subscription",
-            "budget": "banking",
-            "income": "banking",
-            "expenses": "banking"
-        }
-
-        # Identify dataset based on query
-        dataset_name = "banking"
-        for keyword, dataset in dataset_mapping.items():
-            if keyword in request.query.lower():
-                dataset_name = dataset
-                break
-
-        # Fetch customer data & generate insights
-        if request.customer_id and dataset_name in datasets:
-            customer = datasets[dataset_name][datasets[dataset_name]["Customer_ID"] == request.customer_id]
-            if customer.empty:
-                return {"response": "Customer not found."}
-
-            try:
-                if dataset_name == "loan" and "loan_model" in models:
-                    dti = round((customer['existing_loans'].values[0] / customer['income'].values[0]) * 100, 2)
-                    insights["debt_to_income_ratio"] = f"{dti}%"
-                    insights["loan_approval"] = models["loan_model"].predict(customer[['age', 'income', 'credit_score', 'existing_loans']])[0]
-                    insights["expected_interest_rate"] = "7% - 14%" if insights["loan_approval"] else "14% - 20%"
+        response_text = ""
+        is_transaction = False
+        
+        # 1. Auto-detect ID if not provided
+        if not request.customer_id:
+            if id_info := detect_id(request.query):
+                id_type, id_value = id_info
+                
+                # Handle Transaction IDs
+                if id_type == "transaction_id":
+                    insights = get_transaction_insights(id_value)
+                    is_transaction = True
+                    if not insights:
+                        return {"response": "⚠️ No transaction found with this ID"}
                     
-                elif dataset_name == "fraud" and "fraud_model" in models:
-                    insights["fraud_risk"] = models["fraud_model"].predict(customer[['Transaction_Amount', 'Risk_Score']])[0]
-
-                elif dataset_name == "subscription" and "subscription_model" in models:
-                    insights["subscription_risk"] = models["subscription_model"].predict(customer[['Monthly_Fee', 'Monthly_Spending']])[0]
-
-                elif dataset_name == "wealth" and "wealth_model" in models:
-                    age = customer['age'].values[0]
-                    target_age = 55
-                    years_left = target_age - age
-                    net_worth = customer['Net_Worth'].values[0]
-                    annual_income = customer['Annual_Income'].values[0]
-                    annual_investment = round(0.2 * annual_income, 2)  # 20% savings rate assumption
+                    llm_prompt = f"""
+                    Fraud Analysis Request:
                     
-                    future_savings = net_worth
-                    yearly_growth = []
-                    for year in range(years_left):
-                        future_savings = future_savings * 1.07 + annual_investment
-                        yearly_growth.append({"Year": age + year, "Projected Savings": f"${round(future_savings, 2)}"})
+                    TRANSACTION: {id_value}
+                    QUERY: {request.query}
+                    
+                    KEY DATA:
+                    {json.dumps(insights, indent=2)}
+                    
+                    Please analyze:
+                    1. Fraud risk level assessment
+                    2. Transaction pattern analysis
+                    3. Recommended security actions
+                    """
+                    response_text = call_llm(llm_prompt)
+                
+                # Handle Customer/Business IDs
+                else:
+                    request.customer_id = id_value
 
-                    insights["retirement_projection"] = future_savings
-                    insights["investment_strategy"] = f"Invest ${annual_investment} per year to retire with ~${round(future_savings, 2)} at {target_age}."
+        # 2. Handle Customer/Business analysis
+        if not response_text and request.customer_id:
+            insights = get_customer_insights(request.customer_id)
+            if not insights:
+                return {"response": "⚠️ No financial data found for this ID. Please verify the ID."}
 
-            except Exception as e:
-                logger.error(f"⚠️ ML Prediction Failed: {e}")
+            llm_prompt = f"""
+            Financial Analysis Request:
+            
+            QUERY: {request.query}
+            ID: {request.customer_id}
+            
+            AVAILABLE DATA:
+            {json.dumps(insights, indent=2)}
+            
+             Provide:
+            1. Specific suggestions (3 bullet points)
+            2. Expected outcomes 
+            3. Risk considerations make sure to have full meaningful sentence
+            """
+            response_text = call_llm(llm_prompt)
 
-        # **🚀 Generate Enhanced LLM Prompt with Expert Financial Advice**
-        llm_prompt = f"""
-        Generate a professional, structured financial advisory response.
+        # 3. Handle case when no ID is detected
+        if not response_text:
+            llm_prompt = f"""
+            General Financial Advice Request:
+            
+            QUERY: {request.query}
+            
+            Please provide general financial advice and recommendations.
+            """
+            response_text = call_llm(llm_prompt)
 
-        - **User Query**: {request.query}
-        - **Predicted Insights**: {json.dumps(insights, indent=2)}
+        # 4. Format final response
+        if insights:
+            # Filter out complex objects and internal fields
+            table_data = {
+                k: v for k, v in insights.items() 
+                if not isinstance(v, (dict, list)) 
+                and not k.startswith("_")
+                and v is not None
+            }
+            if table_data:
+                response_text += "\n\n### Detailed Information\n" + format_as_table(table_data)
 
-        The response should be:
-        - **Expert-Level** (Like a professional financial consultant)
-        - **Personalized** (Based on user profile)
-        - **Data-Driven** (Justified using AI predictions)
-        - **Actionable** (Providing next steps)
-        - **Concise** (Max 4 sentences)
-        """
-
-        response_text = call_llm(llm_prompt)
-
-        # **🚀 Add Markdown Table for UI Display if Required**
-        if "loan_approval" in insights or "retirement_projection" in insights:
-            response_text += "\n\n### Financial Insights 📊\n"
-            response_text += format_as_table(insights)
-
-        return {"response": response_text}
+        return {"response": response_text if response_text else "No response generated"}
 
     except Exception as e:
-        logger.error(f" Chatbot Error: {e}")
-        raise HTTPException(500, "Chatbot analysis failed")
+        logger.error(f"Chatbot error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Analysis failed. Please try again later."
+        )
 
 
 ################test end
@@ -1172,7 +1803,7 @@ def extract_text_from_image(image):
         response = requests.post(
             f"{API_URL}?key={API_KEY}",
             json=payload,
-            timeout=15
+            timeout=30
         )
 
         if response.status_code != 200:
@@ -1243,7 +1874,7 @@ def generate_financial_advice(transactions):
             f"{API_URL}?key={API_KEY}",
             json=payload,
             headers=headers,
-            timeout=15
+            timeout=30
         )
 
         if response.status_code == 200:
@@ -1314,7 +1945,7 @@ async def classify_image(file: UploadFile = File(...)):
 
 
 #########################################################image
-
+from datetime import datetime
 from pydantic import BaseModel
 class ConsentRequest(BaseModel):
     consent_given: bool
@@ -1323,38 +1954,30 @@ consent_records = {}  # Format: {customer_id: {"consent_given": True/False, "tim
 
 @app.post("/consent/{customer_id}")
 def set_consent(customer_id: str, consent_data: ConsentRequest):
-    """
-     Allows users to give or revoke AI consent.
-     If consent is already granted, avoids unnecessary updates.
-     If revoking when consent isn't set, returns a clear message.
-    """
     try:
         if consent_data.consent_given:
-            #  Prevent redundant updates
             if customer_id in consent_records and consent_records[customer_id]["consent_given"]:
                 return {
                     "customer_id": customer_id,
-                    "message": " Consent was already given.",
+                    "message": "Consent was already given.",
                     "consent_given": True
                 }
             
-            #  Store consent
             consent_records[customer_id] = {
                 "consent_given": True,
-                "timestamp": datetime.datetime.utcnow().isoformat()
+                "timestamp": datetime.now().isoformat()  # Changed to datetime.now()
             }
             return {
                 "customer_id": customer_id,
-                "message": f" Consent granted for {customer_id}",
+                "message": f"Consent granted for {customer_id}",
                 "consent_given": True
             }
         else:
-            #  Check if consent exists before revoking
             if customer_id in consent_records:
                 del consent_records[customer_id]
                 return {
                     "customer_id": customer_id,
-                    "message": f" Consent revoked for {customer_id}",
+                    "message": f"Consent revoked for {customer_id}",
                     "consent_given": False
                 }
             return {
@@ -1363,7 +1986,7 @@ def set_consent(customer_id: str, consent_data: ConsentRequest):
                 "consent_given": False
             }
     except Exception as e:
-        print(f" Error updating consent: {e}")
+        print(f"Error updating consent: {e}")
         raise HTTPException(status_code=500, detail="Internal server error while updating consent.")
 
 

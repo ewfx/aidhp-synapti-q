@@ -54,7 +54,7 @@ const App = () => {
   const [businessId, setBusinessId] = useState('');
   const [query, setQuery] = useState('');
   const [chatbotResponse, setChatbotResponse] = useState('');
-  const [financialAdvice, setFinancialAdvice] = useState('');
+  //const [financialAdvice, setFinancialAdvice] = useState('');
   const [loanApproval, setLoanApproval] = useState('');
   const [fraudRisk, setFraudRisk] = useState('');
   const [churnRisk, setChurnRisk] = useState('');
@@ -68,12 +68,21 @@ const App = () => {
   const [networkStatus, setNetworkStatus] = useState(isOnline ? 'online' : 'offline');
   const abortController = useRef(new AbortController());
   const [listening, setListening] = useState(false);  
-  
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [followUpResponse, setFollowUpResponse] = useState("");
+  const [imageAnalysisResult, setImageAnalysisResult] = useState(null);
   const recognitionRef = useRef(null); 
   const [voiceEnabled, setVoiceEnabled] = useState(true); 
   const [micEnabled, setMicEnabled] = useState(true); 
   const [customerDetails, setCustomerDetails] = useState(null);
+  const [probabilities, setProbabilities] = useState({});
+  const [simpleAdvice, setSimpleAdvice] = useState(null);
+  const [chatHistory, setChatHistory] = useState([]); 
+  const [voiceInputText, setVoiceInputText] = useState("");  
+  const [showClearAll, setShowClearAll] = useState(false);
 
+  const [financialAdvice, setFinancialAdvice] = useState(null);
+ 
   const [fraudData, setFraudData] = useState({
     isLoading: false,
     error: null,
@@ -81,6 +90,13 @@ const App = () => {
   });
 
 
+  const formatTableForChat = (text) => {
+    return text
+      .replace(/\|---\|---\|---\|---\|---\|---\|/g, "|------|-------------|-------------|----------------------|----------------------|----------------------|") // Ensures proper column width
+      .replace(/\|(\s*)/g, "| ") // Adds spacing between columns
+      .replace(/(\s*)\|/g, " |") // Ensures equal spacing
+      .replace(/\n/g, "<br/>"); // Converts new lines into readable HTML format
+  };
   
 
   useEffect(() => {
@@ -146,28 +162,39 @@ const handleApiError = (err, context) => {
 
 // ... rest of the code ...
 
-  const clearAll = () => {
-    if (window.confirm("Clear all inputs and responses?")) {
-      abortController.current.abort();
-      activeRequests.forEach(c => c.abort());
-      activeRequests.clear();
-      abortController.current = new AbortController();
-      setCustomerId('');
-      setBusinessId('');
-      setQuery('');
-      setChatbotResponse('');
-      setFinancialAdvice('');
-      setLoanApproval('');
-      setFraudRisk('');
-      setChurnRisk('');
-      setWealthAdvice('');
-      setSubscriptionAdvice('');
-      setMarketInsights('');
-      setError('');
-      setClassificationResult(null);
-      setSelectedFile(null);
-    }
-  };
+const clearAll = () => {
+  if (window.confirm("Clear all inputs and responses?")) {
+    abortController.current.abort();
+    activeRequests.forEach(c => c.abort());
+    activeRequests.clear();
+    abortController.current = new AbortController();
+
+    setCustomerId('');  // ✅ Resets Customer ID so consent buttons disappear
+    setBusinessId('');
+    setQuery('');
+    setChatbotResponse('');
+    setChatHistory([]);  
+    setFollowUpQuestion('');  
+    setFollowUpResponse('');  
+    setFinancialAdvice('');
+    setLoanApproval('');
+    setFraudRisk('');
+    setChurnRisk('');
+    setWealthAdvice('');
+    setSubscriptionAdvice('');
+    setMarketInsights('');
+    setVoiceInputText('');
+    setSpokenText('');
+    setError('');
+    setClassificationResult(null);  
+    setSelectedFile(null);  
+    setImageAnalysisResult(null);
+    setShowClearAll(false);  
+    setIsLoading(false);
+  }
+};
+
+
 
   const queuedRequest = async (url, options = {}) => {
     return new Promise((resolve, reject) => {
@@ -181,13 +208,83 @@ const handleApiError = (err, context) => {
     });
   };
 
-  const fetchChatbotResponse = async (query, customerId = null) => {
+  const fetchChatbotResponse = async (query) => {
+    if (!query.trim()) {
+      setError("❌ Query cannot be empty.");
+      return "Please enter a valid question.";
+    }
+  
+    setIsLoading(true);
+  
     try {
-        console.log("📢 Sending API request:", { query, customerId });
+      const fullContext = chatHistory.length > 0
+        ? chatHistory.map(entry => `User: ${entry.user}\nAI: ${entry.bot}`).join("\n") + `\nUser: ${query}`
+        : `User: ${query}`;
+  
+      const requestBody = { query: fullContext };
+  
+      const response = await fetch("http://127.0.0.1:8000/chatbot/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(requestBody)
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server Error ${response.status}: ${errorText}`);
+      }
+  
+      const data = await response.json();
+      const aiResponse = data?.response ?? "⚠️ No valid response received from AI.";
+  
+      setChatHistory(prevHistory => [
+        ...prevHistory,
+        { user: query, bot: aiResponse }
+      ]);
+  
+      setChatbotResponse(aiResponse);
+      return aiResponse; // Return the response directly
+  
+    } catch (err) {
+      console.error("❌ Chatbot API Error:", err);
+      setError("⚠️ Unable to fetch chatbot response.");
+      return "Sorry, I couldn't process that request.";
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        // ✅ Construct the payload dynamically
-        const payload = { query };
-        if (customerId && customerId.trim() !== "") payload.customer_id = customerId;  // ✅ Add only if valid
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  //followup test
+  const handleFollowUp = async () => {
+    if (!followUpQuestion.trim()) {
+        setError("❌ Please enter a follow-up question.");
+        return;
+    }
+
+    setIsLoading(true);
+
+    try {
+        // ✅ Generate full context of conversation history
+        const fullContext = chatHistory.length > 0
+            ? chatHistory.map(entry => `User: ${entry.user}\nAI: ${entry.bot}`).join("\n") + `\nUser Follow-Up: ${followUpQuestion}`
+            : `User: ${followUpQuestion}`;
+
+        // ✅ Remove `customer_id` from the request body
+        const requestBody = { query: fullContext };
+
+        console.log("📤 Sending Follow-Up Request with Context:", requestBody);
 
         const response = await fetch("http://127.0.0.1:8000/chatbot/", {
             method: "POST",
@@ -195,64 +292,104 @@ const handleApiError = (err, context) => {
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             },
-            body: JSON.stringify(payload)  // ✅ Only sends customer_id if provided
+            body: JSON.stringify(requestBody)
         });
+
+        console.log("📥 Raw Follow-Up API Response:", response);
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`🚨 Server Error ${response.status}: ${errorText}`);
+            console.error(`❌ Follow-Up Server returned ${response.status}:`, errorText);
+            throw new Error(`Server Error ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
-        console.log("✅ Chatbot Response:", data);
+        console.log("📥 Parsed Follow-Up API Response:", data);
 
-        return data;
+        const aiFollowUpResponse = data?.response ?? "⚠️ No valid response received from AI.";
 
-    } catch (error) {
-        console.error("❌ Chatbot API Error:", error.message);
-        return { response: "⚠️ AI service is temporarily unavailable. Please try again later." };
+        setChatHistory(prevHistory => [
+            ...prevHistory,
+            { user: followUpQuestion, bot: aiFollowUpResponse }
+        ]);
+
+        setFollowUpQuestion("");
+
+    } catch (err) {
+        console.error("❌ Follow-Up Error:", err);
+        setError("⚠️ Unable to process follow-up.");
+    } finally {
+        setIsLoading(false);
     }
 };
 
+  
+    
+  
+  
+  
+  
+  
+  
+
+  //
 
 
+//test
 
 const fetchFinancialAdvice = async () => {
   setIsLoading(true);
   setError('');
   try {
-      if (!customerId) {
-          setError('Customer ID is required');
-          return;
-      }
+    if (!customerId) {
+      throw new Error('Customer ID is required');
+    }
 
-      const data = await queuedRequest(`http://127.0.0.1:8000/financial/${customerId}`);
+    console.log('[DEBUG] Making API request...');
+    const response = await queuedRequest(`http://127.0.0.1:8000/financial/${customerId}`);
+    console.log('[DEBUG] Raw API response:', response);
 
-      if (data.status === "success") {
-          if (data.message) {
-              // Customer not found case
-              setFinancialAdvice(data.message);
-              setCustomerDetails(null);  // Clear previous details
-          } else {
-              // Customer found case - Extract and update details
-              setFinancialAdvice(data.practical_unique_financial_advice || "No advice available.");
-              
-              // Update customer details
-              setCustomerDetails({
-                  age: data.age,
-                  income: data.income,
-                  creditScore: data.credit_score
-              });
-          }
-      } else {
-          throw new Error(data.message || "Unknown error occurred");
-      }
+    // Validate response structure
+    if (!response || typeof response !== 'object') {
+      throw new Error('Invalid API response format');
+    }
+
+    
+    const transformedData = {
+      suggestion: validateString(response.financial_suggestion?.suggestion, 'No suggestion'),
+      confidence: validateNumber(response.financial_suggestion?.confidence, 0),
+      aiAdvice: validateString(response.ai_advice, ''),
+      socialAnalysis: validateObject(response.social_analysis),
+      loanAnalysis: validateObject(response.loan_analysis)
+    };
+
+    console.log('[DEBUG] Transformed data:', transformedData);
+    setFinancialAdvice(transformedData);
+    
   } catch (err) {
-      handleApiError(err, 'Fetching financial advice');
+    console.error('[DEBUG] Fetch error:', err);
+    setError(err.message);
   } finally {
-      setIsLoading(false);
+    setIsLoading(false);
   }
 };
+
+// Validation utilities (add these outside your component)
+function validateString(value, defaultValue = '') {
+  return typeof value === 'string' ? value : defaultValue;
+}
+
+function validateNumber(value, defaultValue = 0) {
+  const num = Number(value);
+  return isNaN(num) ? defaultValue : num;
+}
+
+function validateObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+//Another test
+
+
 
  
   const fetchDocumentClassification = async () => {
@@ -370,17 +507,30 @@ const fetchFinancialAdvice = async () => {
   const fetchLoanApproval = async () => {
     setIsLoading(true);
     setError('');
+    setLoanApproval(''); // Clear previous response
+
     try {
-      if (!customerId) return setError('Customer ID required');
-      
-      const data = await queuedRequest(`http://127.0.0.1:8000/loan/${customerId}`);
-      setLoanApproval(data.loan_approval_insight);
+        if (!customerId) {
+            setError('Customer ID required');
+            return;
+        }
+
+        console.log("🔍 Fetching loan approval for:", customerId); // Debug log
+
+        const response = await queuedRequest(`http://127.0.0.1:8000/loan/${customerId}`);
+
+        console.log("✅ API Response Received:", response); // Debug log
+
+        // ✅ Ensure correct API response key is used
+        setLoanApproval(response.financial_recommendation || "No insight available.");
     } catch (err) {
-      handleApiError(err, 'Loan check');
+        console.error("❌ Error fetching loan approval:", err); // Debug log
+        handleApiError(err, 'Loan check');
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  };
+};
+
 
   
   const fetchFraudRisk = async () => {
@@ -585,7 +735,7 @@ const fetchFinancialAdvice = async () => {
   };
 
   const startVoiceInput = () => {
-    if (!micEnabled) return; // ✅ Prevents listening if mic is disabled
+    if (!micEnabled) return;  // ✅ Prevents listening if mic is disabled
     setError('');
     clearAll();
 
@@ -594,8 +744,7 @@ const fetchFinancialAdvice = async () => {
         return;
     }
 
-    // ✅ Stop ongoing speech synthesis if the button is clicked again
-    window.speechSynthesis.cancel();
+    window.speechSynthesis.cancel(); // ✅ Stop ongoing speech synthesis
 
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'en-US';
@@ -610,6 +759,8 @@ const fetchFinancialAdvice = async () => {
     recognition.onresult = (event) => {
         clearTimeout(speechTimeout);
         const voiceText = event.results[0][0].transcript;
+        
+        setVoiceInputText(voiceText); // ✅ Store the voice input
         handleUserMessage(voiceText);
     };
 
@@ -626,6 +777,7 @@ const fetchFinancialAdvice = async () => {
 
 
 
+
 // ✅ New Stop Function to Stop Both Mic & Speech
 const stopListening = () => {
     if (recognitionRef.current) {
@@ -637,26 +789,53 @@ const stopListening = () => {
 
 
 
-
+const [spokenText, setSpokenText] = useState("");
   const [messages, setMessages] = useState([]);  // ✅ Add this to manage chatbot messages
 
   const handleUserMessage = async (message) => {
-    setMessages((prev) => [...prev, { text: message, sender: "user" }]);
-    const response = await fetchChatbotResponse(message);
-
-    // ✅ Ensure only the actual text is spoken (not the whole object)
-    const responseText = response.response ? response.response : "Sorry, I couldn't process your request.";
-
-    setMessages((prev) => [...prev, { text: responseText, sender: "bot" }]);
-    speakResponse(responseText); // ✅ Now it speaks only the chatbot's response text
-};
-
-
+    if (!message?.trim()) return;
+  
+    // 1. Add user message to UI
+    const userMessage = { text: message, sender: "user" };
+    setMessages(prev => [...prev, userMessage]);
+  
+    try {
+      // 2. Get API response
+      const response = await fetchChatbotResponse(message);
+      console.log("Voice Output - API Response:", response);
+  
+      // 3. Safely extract voice response text
+      let responseText = response || "Sorry, I couldn't process that";
+  
+      // 4. Add bot response to UI
+      const botMessage = { text: responseText, sender: "bot" };
+      setMessages(prev => [...prev, botMessage]);
+  
+      // 5. Handle voice output
+      if (voiceEnabled) {
+        try {
+          await speakResponse(responseText);
+        } catch (speechError) {
+          console.error("Voice Output Error:", speechError);
+        }
+      }
+  
+    } catch (err) {
+      console.error("Message Handling Error:", err);
+      const errorMessage = "Sorry, something went wrong";
+      setMessages(prev => [...prev, { text: errorMessage, sender: "bot" }]);
+      if (voiceEnabled) speakResponse(errorMessage);
+    }
+  };
+// Enhanced speakResponse function
 const speakResponse = (text) => {
   if (!voiceEnabled) return; // ✅ Prevents speaking if voice output is disabled
   const utterance = new SpeechSynthesisUtterance(text);
   window.speechSynthesis.speak(utterance);
 };
+
+
+
 
     
   
@@ -752,21 +931,28 @@ const speakResponse = (text) => {
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginTop: '15px' }}>
-        <button style={buttonStyle} onClick={fetchFinancialAdvice} disabled={isLoading}>📊 Financial Advice</button>
-        <button style={buttonStyle} onClick={fetchLoanApproval} disabled={isLoading}>💳 Loan Status</button>
-        <button style={buttonStyle} onClick={fetchFraudRisk} disabled={isLoading}>⚠️ Fraud Risk</button>
-        <button style={buttonStyle} onClick={fetchChurnRisk} disabled={isLoading}>📉 Churn Risk</button>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginTop: '15px' }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+        <button style={{ ...buttonStyle, backgroundColor: "#2196F3", color: "white" }} onClick={fetchFinancialAdvice} disabled={isLoading}>📊 Financial Advice</button>
+        <button style={{ ...buttonStyle, backgroundColor: "#4CAF50", color: "white" }} onClick={fetchLoanApproval} disabled={isLoading}>💳 Loan Status</button>
+        <button style={{ ...buttonStyle, backgroundColor: "#FF5722", color: "white" }} onClick={fetchFraudRisk} disabled={isLoading}>⚠️ Fraud Risk</button>
+        <button style={{ ...buttonStyle, backgroundColor: "#9C27B0", color: "white" }} onClick={fetchChurnRisk} disabled={isLoading}>📉 Churn Risk</button>
+        </div>
+
      
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginTop: '10px' }}>
-        <button style={{ ...buttonStyle, backgroundColor: '#4CAF50' }} onClick={() => setUserConsent(true)} disabled={isLoading}>✅ Give Consent</button>
-        <button style={{ ...buttonStyle, backgroundColor: '#f44336' }} onClick={() => setUserConsent(false)} disabled={isLoading}>❌ Revoke Consent</button>
-        <button style={{ ...buttonStyle, backgroundColor: '#FFC107' }} onClick={checkUserConsent} disabled={isLoading}>🔍 Check Consent</button>
-      </div>
+        {customerId && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center", marginTop: "10px" }}>
+            <button style={{ ...buttonStyle, backgroundColor: "#4CAF50" }} onClick={() => setUserConsent(true)} disabled={isLoading}>✅ Give Consent</button>
+            <button style={{ ...buttonStyle, backgroundColor: "#f44336" }} onClick={() => setUserConsent(false)} disabled={isLoading}>❌ Revoke Consent</button>
+            <button style={{ ...buttonStyle, backgroundColor: "#FFC107", color: "#333" }} onClick={checkUserConsent} disabled={isLoading}>🔍 Check Consent</button>
+          </div>
+        )}
+
+
     </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginTop: '10px' }}>
           <button style={buttonStyle} onClick={fetchWealthAdvice} disabled={isLoading}>📈 Wealth Management</button>
           <button style={buttonStyle} onClick={fetchSubscriptionAdvice} disabled={isLoading}>🔄 Subscription</button>
           <button style={buttonStyle} onClick={fetchMarketInsights} disabled={isLoading}>🌐 Market Insights</button>
@@ -779,7 +965,7 @@ const speakResponse = (text) => {
         borderRadius: '8px',
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
           <input
             placeholder="Ask a financial question..."
             value={query}
@@ -797,9 +983,21 @@ const speakResponse = (text) => {
           >
               🔍 Ask
           </button>
-          <button onClick={stopListening}>
-              Stop Voice & Mic
+          <button 
+            style={{ 
+              ...buttonStyle, 
+              backgroundColor: '#f44336',
+              color: 'white'
+            }} 
+            onClick={stopListening}
+            disabled={isLoading}
+          >
+            🎤🎙️Stop
           </button>
+
+
+          
+
 
 
 
@@ -844,8 +1042,122 @@ const speakResponse = (text) => {
           .join('\n')}`}
             />
           )}
-          {chatbotResponse && <ResponseBox title="AI Response" content={chatbotResponse} />}
-          {financialAdvice && <ResponseBox title="Financial Advice" content={financialAdvice} />}
+{chatHistory.length > 0 && (
+  <div style={{
+    maxHeight: "400px",
+    overflowY: "scroll",
+    padding: "10px",
+    backgroundColor: "#f9f9f9",
+    borderRadius: "8px",
+    boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.1)",
+    width: "100%"
+  }}>
+    <h4>💬 Conversation History</h4>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      minWidth: "fit-content"
+    }}>
+      {chatHistory.map((msg, index) => {
+        const formatText = (text) => {
+          return text.split(/(?<=\. )/g).map((sentence, i) => (
+            <div key={i} style={{ 
+              display: "block",
+              whiteSpace: "nowrap",
+              overflowX: "auto",
+              scrollbarWidth: "thin", // Makes scrollbar thinner
+              height: "calc(100% + 8px)", // Compensates for thinner scrollbar
+              paddingBottom: "8px" // Space for scrollbar
+            }}>
+              {sentence}
+            </div>
+          ));
+        };
+
+        return (
+          <div key={index} style={{
+            marginBottom: "10px",
+            padding: "8px",
+            borderRadius: "5px",
+            backgroundColor: index % 2 === 0 ? "#e3f2fd" : "#f1f8e9"
+          }}>
+            <div style={{ minWidth: "100%" }}>
+              <p style={{ margin: "0 0 5px 0" }}>
+                <strong>👤 You:</strong> {formatText(msg.user)}
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>🤖 Synapti-Q:</strong> {formatText(msg.bot)}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Custom scrollbar styling */}
+    <style>
+      {`
+        ::-webkit-scrollbar {
+          height: 8px;
+          width: 12px;
+        }
+        ::-webkit-scrollbar-thumb {
+          background-color: rgba(0,0,0,0.2);
+          border-radius: 4px;
+        }
+      `}
+    </style>
+  </div>
+)}
+
+{/* ✅ Speak Chatbot Response (Only If Available) */}
+{chatHistory.length > 0 && chatHistory[chatHistory.length - 1]?.bot && (
+  <button 
+    onClick={() => speakResponse(chatHistory[chatHistory.length - 1]?.bot || "No response to speak.")} 
+    style={{
+      ...buttonStyle,
+      backgroundColor: "#FF9800",
+      color: "white",
+      marginTop: "10px",
+      width: "100%",
+      maxWidth: "200px"
+    }}
+    disabled={isLoading}
+  >
+    🔊 Speak Last Response
+  </button>
+)}
+
+
+
+
+
+
+          {financialAdvice && (
+                <ResponseBox 
+                    title="Financial Advice"
+                    content={`
+                    📌  Suggested Action: ${financialAdvice.suggestion}
+                        Confidence Level: ${(financialAdvice.confidence * 100).toFixed(2)}%
+                    
+                        Synapti-Q Generated Insights:
+                    ${financialAdvice.aiAdvice || "No detailed advice available"}
+                    `}
+                />
+          )}
+          {voiceInputText && (
+              <ResponseBox 
+                  title="🎙️ Voice Input" 
+                  content={voiceInputText} 
+              />
+          )}
+          {spokenText && (
+            <ResponseBox 
+              title="🔊 Synapti-Q Voice Assis" 
+              content={spokenText} 
+            />
+          )}
+
           {loanApproval && <ResponseBox title="Loan Status" content={loanApproval} />}
           {fraudRisk && <ResponseBox title="Fraud Risk" content={fraudRisk} />}
           {churnRisk && <ResponseBox title="Churn Risk" content={churnRisk} />}
@@ -853,41 +1165,80 @@ const speakResponse = (text) => {
           {subscriptionAdvice && <ResponseBox title="Subscription Advice" content={subscriptionAdvice} />}
           {marketInsights && <ResponseBox title="Market Insights" content={marketInsights} />}
         </div>
+          
+        
 
-        <button 
-          onClick={clearAll}
-          style={{
-            marginTop: '25px',
-            padding: '10px 25px',
-            backgroundColor: '#e53935',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            width: '100%',
-            fontSize: '16px'
-          }}
-          disabled={isLoading}
-        >
-          🗑️ Clear All
-        </button>
+{(chatbotResponse || chatHistory.length > 0 || financialAdvice || loanApproval || fraudRisk || classificationResult || churnRisk || 
+  wealthAdvice || subscriptionAdvice || marketInsights || voiceInputText || spokenText) && (
+    <button 
+      onClick={() => {
+        clearAll();
+        setTimeout(() => setShowClearAll(false), 100);
+      }}
+      style={{
+        padding: "10px 15px",
+        border: "none",
+        borderRadius: "5px",
+        backgroundColor: "#e53935",
+        color: "white",
+        cursor: "pointer",
+        fontSize: "16px",
+        width: "100%",
+        maxWidth: "200px",
+        marginTop: "15px"
+      }}
+    >
+      🗑️ Clear All
+    </button>
+)}
+
+
+
+
       </div>
     </div>
   );
 };
 
-const ResponseBox = ({ title, content }) => (
-  <div style={{ 
-    padding: '15px', 
-    backgroundColor: '#f8f9fa', 
-    borderRadius: '6px', 
-    marginBottom: '15px',
-    borderLeft: `4px solid #2196F3`
-  }}>
-    <h4 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>{title}</h4>
-    <p style={{ margin: 0, color: '#4a4a4a', whiteSpace: 'pre-line' }}>{content}</p>
-  </div>
-);
+
+
+
+const ResponseBox = ({ title, content }) => {
+  return (
+    <div style={{
+      maxHeight: '500px',
+      overflowY: 'auto',
+      padding: '20px',
+      backgroundColor: 'white',
+      borderRadius: '8px',
+      marginBottom: '20px',
+      border: '1px solid #e0e0e0',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+    }}>
+      <h3 style={{
+        margin: '0 0 16px 0',
+        color: '#202124',
+        fontSize: '18px',
+        fontWeight: 600,
+        borderBottom: '2px solid #4285f4',
+        paddingBottom: '8px'
+      }}>
+        {title}
+      </h3>
+
+      <div style={{ 
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        fontSize: '15px',
+        lineHeight: '1.6'
+      }}>
+        {content}
+      </div>
+    </div>
+  );
+};
+
+
 
 const inputStyle = {
   width: '100%',
@@ -898,20 +1249,38 @@ const inputStyle = {
   fontSize: '16px'
 };
 
-const buttonStyle = {
-  padding: '10px 15px',
-  border: 'none',
-  borderRadius: '5px',
-  backgroundColor: '#2196F3',
-  color: 'white',
-  cursor: 'pointer',
-  fontSize: '14px',
-  flex: 1,
-  transition: 'opacity 0.2s',
-  ':disabled': {
-    opacity: 0.6,
-    cursor: 'not-allowed'
-  }
+const buttonContainerStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "center",
+  gap: "12px",
+  padding: "10px 0",
 };
+
+
+const buttonStyle = {
+  padding: "12px 16px", // ✅ Comfortable padding
+  fontSize: "16px", // ✅ Uniform text size
+  fontWeight: "bold",
+  border: "none",
+  borderRadius: "8px", // ✅ Smooth rounded edges
+  cursor: "pointer",
+  width: "160px", // ✅ Fixed width for consistency
+  textAlign: "center",
+  display: "inline-block",
+  transition: "background-color 0.2s, transform 0.1s",
+  boxShadow: "2px 2px 5px rgba(0, 0, 0, 0.2)", // ✅ Subtle shadow
+};
+
+const buttonHoverStyle = {
+  transform: "scale(1.05)", // ✅ Slight animation
+};
+
+const disabledButtonStyle = {
+  opacity: 0.6,
+  cursor: "not-allowed",
+};
+
+
 
 export default App;
