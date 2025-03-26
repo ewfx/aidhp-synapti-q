@@ -52,9 +52,18 @@ import pickle
 from datetime import datetime
 from pydantic import BaseModel
 from datetime import datetime 
-
-
-
+import os
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel
+from typing import Optional
+import joblib
+import pandas as pd
+import numpy as np
+from fastapi import Path
+import logging
+import requests
+from nltk.sentiment import SentimentIntensityAnalyzer
+import nltk
 
 load_dotenv()
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Datasets')
@@ -362,22 +371,7 @@ def get_loan_customer_ids(customer_id: int =20):
         } for customer in loan_data]
     }
 
-
-
 #####
-
-import os
-from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
-from typing import Optional
-import joblib
-import pandas as pd
-import numpy as np
-from fastapi import Path
-import logging
-import requests
-from nltk.sentiment import SentimentIntensityAnalyzer
-import nltk
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
