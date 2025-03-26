@@ -57,12 +57,13 @@ Backend Setup (FastAPI)
 1. cd aidhp-synapti-q\code
 2. Create & Activate a Virtual Environment
    Windows (PowerShell) : run below command
+   
    python -m venv venv
    Set-ExecutionPolicy Unrestricted -Scope Process
    .\venv\Scripts\activate
-3. Install Dependencies
+4. Install Dependencies
    pip install -r requirements.txt
-4. Run the Backend Server
+5. Run the Backend Server
    uvicorn banking_api:app --host 0.0.0.0 --port 8000 --reload
 
    The backend API will now be running at http://127.0.0.1:8000.
