@@ -137,7 +137,7 @@ Despite these challenges, our team successfully built SynaptiQ Financial Assista
    
 **Backend Setup (FastAPI)**
 1. cd aidhp-synapti-q\code
-2. Create & Activate a Virtual Environment
+2. Create & Activate a Virtual Environment. Make sure Python is installed
    Windows (PowerShell) : run below command
    
    python -m venv venv
@@ -146,11 +146,11 @@ Despite these challenges, our team successfully built SynaptiQ Financial Assista
    
    .\venv\Scripts\activate
    
-4. Install Dependencies
+3. Install Dependencies
    
    pip install -r requirements.txt
    
-6. Run the Backend Server
+4. Run the Backend Server
    
    uvicorn banking_api:app --host 0.0.0.0 --port 8000 --reload
 
@@ -165,5 +165,5 @@ Despite these challenges, our team successfully built SynaptiQ Financial Assista
 - 🔹 Other: OpenAI API / Twilio / Stripe
 
 ## 👥 Team : SynaptiQ
-- **Your Name** - Vivek Mani
-- **Teammate 2** - Sonali Dwivedi & Suma
+- **Team** - Vivek Mani,Sonali Dwivedi, Sumabindu, Kusuma
+- 
