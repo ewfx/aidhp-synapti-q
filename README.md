@@ -144,6 +144,7 @@ Despite these challenges, our team successfully built SynaptiQ Financial Assista
 
 Note - Create .env file unser src folder and add below lines
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
 API_KEY = "enter your key here"
 
 1. cd aidhp-synapti-q\code
@@ -169,10 +170,37 @@ API_KEY = "enter your key here"
    
 
 ## 🏗️ Tech Stack
-- 🔹 Frontend: React / Vue / Angular
-- 🔹 Backend: Node.js / FastAPI / Django
-- 🔹 Database: PostgreSQL / Firebase
-- 🔹 Other: OpenAI API / Twilio / Stripe
+Backend Technologies:
+
+FastAPI!
+
+XGBoost
+
+FAISS
+
+Google Gemini API
+
+Torchvision & OpenAI CLIP
+
+Pandas & NumPy
+
+Frontend Technologies:
+
+ReactJS
+
+Redux
+
+Material-UI
+
+Axios
+
+Chart.js
+
+Speech Recognition API
+
+Service Workers
+
+React Router
 
 ## 👥 Team : SynaptiQ
 - **Team** - Vivek Mani,Sonali Dwivedi, Sumabindu, Kusuma
