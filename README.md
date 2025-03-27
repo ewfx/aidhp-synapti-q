@@ -73,21 +73,33 @@ By leveraging LLMs, NLP, and financial modeling, SynaptiQ provides a hyper-perso
 
 10.  **It analyzes fianncial imgaes, such bank statements, slary slips or bills and provide insight based out of it******
 
-**Note - ChatBot special features-> here are few examples**
+**Note - ChatBot special features-> here are few examples** Important point to note - In case gen-AI srvices are down in this situation chatbot will give responses from in house trained models. So we are not 100% dependent on gen-AI
 
    Suppose user asked Financial advise for a customer with id, CUST-0001 then fiancial insight api returns a hyper personalized response
    On top of this if user wants to know more example or insights for CUST-0001 then user can start discussion with Bot,
+      
       example - > can yo give few example or create tabular example and explain invstment risk for CUST-0001
                   Bot responses and this discussion can go on.
 
                   Similarly for fraud detection and etc.
    
    This chatbot is super dynamic, it will answer real time financial based questions, and not just answer an user can interact and continue the discussion
+      
       example - User-> tell me how to calculate compund interest
                Bot -> It provides a response with all calculation
                User-> canyou explain with an example
                Bot-> It provides response with example ......and this discussion can go on
-   
+               
+  11. **We have trained cutomized model based on datasets. Here are Model names ->**(.py files for these models can be found in src)
+        a. financial_suggestion_model.pkl
+        b. financial_suggestion_model.pkl
+        c. wealth_model.pkl
+        d. wealth_model_label_encoder.pkl
+        e. subscription_model.pkl
+        f. fraud_model.pkl
+        g. loan_model.pkl
+        h. loan_model_label_encoder.pkl
+        i. churn_model.pkl
 
 ## 🛠️ How We Built It
 
