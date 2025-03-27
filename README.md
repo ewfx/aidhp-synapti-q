@@ -49,7 +49,7 @@ We built SynaptiQ Financial Assistant to empower users with AI-driven financial 
 By leveraging LLMs, NLP, and financial modeling, SynaptiQ provides a hyper-personalized AI assistant that helps users make smarter financial decisions. 🚀
 
 ## ⚙️ What It Does
-1. **Personalized Financial Advice**  
+****1. **Personalized Financial Advice**  
 2. **Fraud Detection & Prevention**
 3. Loan Approval Predictions**
 4. Churn Risk Analysis (with Consent-Based AI Decisioning)**
@@ -57,7 +57,24 @@ By leveraging LLMs, NLP, and financial modeling, SynaptiQ provides a hyper-perso
 6.  **Wealth Management Recommendations**
 7.  **Business & Market Insights**
 8.  AI-Powered Chatbot (with Voice & Image Processing)**
-9.  Social Media-Based Financial Sentiment Analysis** 
+9.  **Social Media-Based Financial Sentiment Analysis****
+10.  **It analyzes fianncial imgaes, such bank statements, slary slips or bills and provide insight based out of it******
+
+**Note - ChatBot special features-> here are few examples**
+
+   Suppose user asked Financial advise for a customer with id, CUST-0001 then fiancial insight api returns a hyper personalized response
+   On top of this if user wants to know more example or insights for CUST-0001 then user can start discussion with Bot,
+      example - > can yo give few example or create tabular example and explain invstment risk for CUST-0001
+                  Bot responses and this discussion can go on.
+
+                  Similarly for fraud detection and etc.
+   
+   This chatbot is super dynamic, it will answer real time financial based questions, and not just answer an user can interact and continue the discussion
+      example - User-> tell me how to calculate compund interest
+               Bot -> It provides a response with all calculation
+               User-> canyou explain with an example
+               Bot-> It provides response with example ......and this discussion can go on
+   
 
 ## 🛠️ How We Built It
 
