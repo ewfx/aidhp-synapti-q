@@ -50,14 +50,23 @@ By leveraging LLMs, NLP, and financial modeling, SynaptiQ provides a hyper-perso
 
 ## ⚙️ What It Does
 ****1. **Personalized Financial Advice**  
+
 2. **Fraud Detection & Prevention**
+
 3. Loan Approval Predictions**
+
 4. Churn Risk Analysis (with Consent-Based AI Decisioning)**
+
 5. Subscription Management Insights**
+
 6.  **Wealth Management Recommendations**
+
 7.  **Business & Market Insights**
+
 8.  AI-Powered Chatbot (with Voice & Image Processing)**
+
 9.  **Social Media-Based Financial Sentiment Analysis****
+
 10.  **It analyzes fianncial imgaes, such bank statements, slary slips or bills and provide insight based out of it******
 
 **Note - ChatBot special features-> here are few examples**
