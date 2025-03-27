@@ -168,7 +168,7 @@ Despite these challenges, our team successfully built SynaptiQ Financial Assista
    
 **Backend Setup (FastAPI)**
 
-Note - Create .env file unser src folder and add below lines
+**Note** - Create .env file unser src folder and add below lines
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 API_KEY = "enter your key here"
