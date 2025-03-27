@@ -90,7 +90,7 @@ By leveraging LLMs, NLP, and financial modeling, SynaptiQ provides a hyper-perso
                User-> canyou explain with an example
                Bot-> It provides response with example ......and this discussion can go on
                
-  11. **We have trained cutomized model based on datasets. Here are Model names ->**(.py files for these models can be found in src)
+  11. **We have trained cutomized model based on datasets. Here are Model names and for all these models we have dataset created and placed under src/dataset ->**(.py files for these models can be found in src)
 
        a. financial_suggestion_model.pkl
 
