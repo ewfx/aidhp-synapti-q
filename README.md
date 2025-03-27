@@ -34,7 +34,7 @@ Gdrive demo link - https://drive.google.com/file/d/1LMs2giKhYGR9LNHNufkEvCyzFx-y
 
 Gdrive backup demo link - https://drive.google.com/file/d/16v0Qd787tJpOKdffxeYwxcCPZcjROVO1/view?usp=drive_link
 
-🖼️ Screenshots: An example screen which gives insight how we have trained our models and f1 score can be found.
+🖼️ Screenshots: An example screen which gives insight how we have trained our models and f1 score can be found, for financial advises - financial_suggestion_model.pkl
 
 ![Screenshot 2025-03-25 000254](https://github.com/user-attachments/assets/ed2a40ae-4f10-4da7-9691-a084ab9bcc2b)
 
@@ -91,14 +91,23 @@ By leveraging LLMs, NLP, and financial modeling, SynaptiQ provides a hyper-perso
                Bot-> It provides response with example ......and this discussion can go on
                
   11. **We have trained cutomized model based on datasets. Here are Model names ->**(.py files for these models can be found in src)
-        a. financial_suggestion_model.pkl
-        b. financial_suggestion_model.pkl
-        c. wealth_model.pkl
+
+       a. financial_suggestion_model.pkl
+
+       b. financial_suggestion_model.pkl
+
+       c. wealth_model.pkl
+      
         d. wealth_model_label_encoder.pkl
-        e. subscription_model.pkl
-        f. fraud_model.pkl
+
+       e. subscription_model.pkl
+
+       f. fraud_model.pkl
+
         g. loan_model.pkl
+
         h. loan_model_label_encoder.pkl
+
         i. churn_model.pkl
 
 ## 🛠️ How We Built It
