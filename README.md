@@ -141,8 +141,13 @@ Despite these challenges, our team successfully built SynaptiQ Financial Assista
    The frontend app will be available at http://localhost:3000
    
 **Backend Setup (FastAPI)**
+
+Note - Create .env file unser src folder and add below lines
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+API_KEY = "enter your key here"
+
 1. cd aidhp-synapti-q\code
-2. Create & Activate a Virtual Environment. Make sure Python is installed
+2. Create & Activate a Virtual Environment. Make sure Python is installed( we have build this on python 3.12.0)
    Windows (PowerShell) : run below command
    
    python -m venv venv
