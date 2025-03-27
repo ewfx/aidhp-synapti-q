@@ -33,7 +33,11 @@ Backup demo link - https://youtu.be/ZfeX1CWt7l0
 Gdrive demo link - https://drive.google.com/file/d/1LMs2giKhYGR9LNHNufkEvCyzFx-y730L/view?usp=drive_link
 
 Gdrive backup demo link - https://drive.google.com/file/d/16v0Qd787tJpOKdffxeYwxcCPZcjROVO1/view?usp=drive_link
-🖼️ Screenshots:
+
+🖼️ Screenshots: An example screen which gives insight how we have trained our models and f1 score can be found.
+
+![Screenshot 2025-03-25 000254](https://github.com/user-attachments/assets/ed2a40ae-4f10-4da7-9691-a084ab9bcc2b)
+
 
 PPT: https://github.com/ewfx/aidhp-synapti-q/tree/main/artifacts/demo
 
@@ -192,7 +196,8 @@ API_KEY = "enter your key here"
    uvicorn banking_api:app --host 0.0.0.0 --port 8000 --reload
 
    The backend API will now be running at http://127.0.0.1:8000.
-   
+
+ Note - Testcases are placed under test folder. We have unit tests for api end points.To run tests case navigate to tests folder after creating virtual environment then **python test_banking_api.py**  
    
 
 ## 🏗️ Tech Stack
