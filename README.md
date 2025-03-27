@@ -176,6 +176,10 @@ Implementing voice & image-based chatbot interactions for seamless user engageme
 Despite these challenges, our team successfully built SynaptiQ Financial Assistant, delivering AI-driven financial intelligence that enhances decision-making and security. 🚀
 
 ## 🏃 How to Run
+
+   Api endpoint file name - banking_api.py
+   FE file name - App.js
+   
 **Frontend Setup (React)**
 1. Clone the repository  
    ```sh
